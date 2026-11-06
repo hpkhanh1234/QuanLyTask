@@ -4,19 +4,39 @@
  * 
  * Checks every 30 seconds if current time matches scheduled times.
  * Sends combined notification to Telegram group.
- * File-based dedup prevents double sends.
+ * File-based dedup prevents double sends. Telegram configuration is stored in PostgreSQL.
  */
 
 const fs = require("fs");
 const path = require("path");
+const { PrismaClient } = require("@prisma/client");
 
-const DATA_DIR = path.join(__dirname, "..", "data");
-const CONFIG_FILE = path.join(DATA_DIR, "telegram-config.json");
-const SENT_FILE = path.join(DATA_DIR, "cron-sent-today.json");
+const SENT_FILE = path.join(__dirname, "..", "data", "cron-sent-today.json");
+const prisma = new PrismaClient();
 
-function getConfig() {
+async function getConfig() {
   try {
-    return JSON.parse(fs.readFileSync(CONFIG_FILE, "utf-8"));
+    const record = await prisma.telegramConfig.findUnique({ where: { id: 1 } });
+    if (!record) return null;
+
+    let scheduledTimes = [];
+    try {
+      const parsed = JSON.parse(record.scheduledTimes || "[]");
+      if (Array.isArray(parsed)) {
+        scheduledTimes = parsed.filter((time) => typeof time === "string");
+      }
+    } catch {}
+
+    return {
+      enabled: record.enabled,
+      notifyGroupChatId: record.notifyGroupChatId || "",
+      notifyOnNewRequest: record.notifyOnNewRequest,
+      notifyOnStatusChange: record.notifyOnStatusChange,
+      notifyOnDeadline: record.notifyOnDeadline,
+      notifyOnOverdue: record.notifyOnOverdue,
+      autoRunCron: record.autoRunCron,
+      scheduledTimes,
+    };
   } catch {
     return null;
   }
@@ -148,7 +168,7 @@ function formatReportMessage(filteredOverdue, filteredUpcoming) {
 }
 
 async function runCheck() {
-  const config = getConfig();
+  const config = await getConfig();
   if (!config || !config.autoRunCron || !config.enabled || !config.scheduledTimes?.length) return;
 
   const vnTime = getVNTime();
@@ -167,8 +187,6 @@ async function runCheck() {
 
   // Query overdue requests via Prisma
   try {
-    const { PrismaClient } = require("@prisma/client");
-    const prisma = new PrismaClient();
     const now = new Date();
     const twoDaysFromNow = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
 
@@ -194,7 +212,6 @@ async function runCheck() {
 
     if (filteredOverdue.length === 0 && filteredUpcoming.length === 0) {
       console.log("[Cron] No requests to notify");
-      await prisma.$disconnect();
       return;
     }
 
@@ -205,7 +222,6 @@ async function runCheck() {
     }
 
     console.log(`[Cron] Completed: overdue=${filteredOverdue.length}, upcoming=${filteredUpcoming.length}`);
-    await prisma.$disconnect();
   } catch (err) {
     console.error("[Cron] Error:", err.message);
   }

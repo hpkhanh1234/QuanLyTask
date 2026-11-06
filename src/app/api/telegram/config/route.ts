@@ -14,7 +14,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const config = loadTelegramConfig();
+    const config = await loadTelegramConfig();
     return NextResponse.json({ config });
   } catch (error) {
     console.error("Error fetching Telegram config:", error);
@@ -49,12 +49,14 @@ export async function POST(req: Request) {
       autoRunCron: body.autoRunCron ?? false,
       scheduledTimes: body.scheduledTimes ?? ["08:00", "12:00", "17:00"],
       lastCronRun: body.lastCronRun ?? null,
-    };    saveTelegramConfig(config);
+      lastManualRun: null,
+    };
+    const savedConfig = await saveTelegramConfig(config);
 
     return NextResponse.json({ 
       success: true, 
       message: "Đã lưu cấu hình thành công!", 
-      config 
+      config: savedConfig
     });
   } catch (error) {
     console.error("Error saving Telegram config:", error);
@@ -72,7 +74,7 @@ export async function PATCH() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const config = loadTelegramConfig();
+    const config = await loadTelegramConfig();
 
     const testMessage = `🔔 <b>Tin nhắn test từ Hệ thống Quản lý Yêu cầu</b>\n\nXin chào!\n\nĐây là tin nhắn kiểm tra cấu hình thông báo tự động.\n\n✅ Cấu hình đã được thiết lập!\n\nThông báo sẽ được gửi đến group:\n${config.notifyGroupChatId ? `👥 Group: ${config.notifyGroupChatId}` : "👥 Chưa cấu hình group"}\n\nNhân viên nhận tin qua Telegram đã gán ở trang Quản lý người dùng.\n\n━━━━━━━━━━━━━━━━━━━\n🕐 ${new Date().toLocaleString("vi-VN")}`;
 

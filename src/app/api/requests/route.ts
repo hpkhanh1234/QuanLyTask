@@ -204,7 +204,7 @@ export async function POST(req: Request) {
     }
 
     // ── Telegram notifications ──
-    const config = loadTelegramConfig();
+    const config = await loadTelegramConfig();
     const requestLink = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/requests/${request.id}`;
 
     // Rule 1: When assigned → send to assignee via Telegram

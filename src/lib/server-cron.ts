@@ -5,11 +5,10 @@
 
 import prisma from "./prisma";
 import { sendTelegramMessage, formatCombinedNotification } from "./telegram";
-import { loadTelegramConfig } from "./telegram-config";
-import fs from "fs";
-import path from "path";
-
-const CRON_STATE_FILE = path.join(process.cwd(), "data", "cron-state.json");
+import {
+  loadTelegramConfig,
+  updateTelegramCronState,
+} from "./telegram-config";
 
 // ── Mutex lock ──
 let isRunning = false;
@@ -19,21 +18,19 @@ interface CronState {
   lastManualRun: string | null;
 }
 
-function loadCronState(): CronState {
-  try {
-    if (fs.existsSync(CRON_STATE_FILE)) {
-      return JSON.parse(fs.readFileSync(CRON_STATE_FILE, "utf-8"));
-    }
-  } catch {}
-  return { lastRun: null, lastManualRun: null };
+async function loadCronState(): Promise<CronState> {
+  const config = await loadTelegramConfig();
+  return {
+    lastRun: config.lastCronRun,
+    lastManualRun: config.lastManualRun,
+  };
 }
 
-function saveCronState(state: CronState): void {
-  const dataDir = path.join(process.cwd(), "data");
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
-  }
-  fs.writeFileSync(CRON_STATE_FILE, JSON.stringify(state, null, 2), "utf-8");
+async function saveCronState(state: CronState): Promise<void> {
+  await updateTelegramCronState({
+    lastCronRun: state.lastRun,
+    lastManualRun: state.lastManualRun,
+  });
 }
 
 /**
@@ -45,7 +42,7 @@ async function executeCheck(bypassDedup: boolean): Promise<{ ran: boolean; stats
     return { ran: false };
   }
 
-  const config = loadTelegramConfig();
+  const config = await loadTelegramConfig();
   if (!config.autoRunCron || !config.enabled) {
     return { ran: false };
   }
@@ -80,9 +77,9 @@ async function executeCheck(bypassDedup: boolean): Promise<{ ran: boolean; stats
 
     // Skip if nothing to send
     if (filteredOverdue.length === 0 && filteredUpcoming.length === 0) {
-      const state = loadCronState();
+      const state = await loadCronState();
       state.lastRun = now.toISOString();
-      saveCronState(state);
+      await saveCronState(state);
       return { ran: true, stats: { notificationsSent: 0, skipped: "No requests" } };
     }
 
@@ -157,9 +154,9 @@ async function executeCheck(bypassDedup: boolean): Promise<{ ran: boolean; stats
     }
 
     // Save state
-    const state = loadCronState();
+    const state = await loadCronState();
     state.lastRun = now.toISOString();
-    saveCronState(state);
+    await saveCronState(state);
 
     const stats = {
       overdueRequests: overdueRequests.length,
@@ -172,9 +169,9 @@ async function executeCheck(bypassDedup: boolean): Promise<{ ran: boolean; stats
     return { ran: true, stats };
   } catch (error) {
     console.error("[Server Cron] Error:", error);
-    const state = loadCronState();
+    const state = await loadCronState();
     state.lastRun = new Date().toISOString();
-    saveCronState(state);
+    await saveCronState(state);
     return { ran: true, stats: { error: String(error) } };
   } finally {
     isRunning = false;
@@ -192,7 +189,7 @@ export async function runOverdueCheckIfDue(): Promise<{ ran: boolean; stats?: an
  * Manual run: bypasses dedup, has 30-second cooldown
  */
 export async function forceRunOverdueCheck(): Promise<{ ran: boolean; stats?: any }> {
-  const state = loadCronState();
+  const state = await loadCronState();
 
   // 30-second cooldown for manual runs
   if (state.lastManualRun) {
@@ -206,7 +203,7 @@ export async function forceRunOverdueCheck(): Promise<{ ran: boolean; stats?: an
   }
 
   state.lastManualRun = new Date().toISOString();
-  saveCronState(state);
+  await saveCronState(state);
 
   return executeCheck(true);
 }

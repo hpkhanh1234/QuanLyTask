@@ -339,7 +339,7 @@ export async function PATCH(
     }
 
     // ── Send Telegram notifications ──
-    const config = loadTelegramConfig();
+    const config = await loadTelegramConfig();
     const requestLink = `${process.env.NEXTAUTH_URL || "http://localhost:3000"}/requests/${params.id}`;
 
     // Helper: send to user's Telegram

@@ -9,21 +9,21 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  password      String?
-  image         String?
-  role          String    @default("requester") // requester, agent, admin
-  department    String?
-  isActive      Boolean   @default(true)
-  telegramChatId String?  // Telegram chat ID for notifications
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  emailVerified  DateTime?
+  password       String?
+  image          String?
+  role           String    @default("requester") // requester, agent, admin
+  department     String?
+  isActive       Boolean   @default(true)
+  telegramChatId String? // Telegram chat ID for notifications
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  requestsCreated  Request[]    @relation("Requester")
-  requestsAssigned Request[]    @relation("Assignee")
+  requestsCreated  Request[]           @relation("Requester")
+  requestsAssigned Request[]           @relation("Assignee")
   assignments      RequestAssignment[]
   comments         Comment[]
   auditLogs        AuditLog[]
@@ -85,39 +85,56 @@ model PriorityLevel {
   label     String
   color     String   @default("#3b82f6")
   bgColor   String   @default("#DBEAFE")
-  textColor  String  @default("#1E40AF")
+  textColor String   @default("#1E40AF")
   sortOrder Int      @default(0)
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 }
 
+model TelegramConfig {
+  // Singleton row used by the admin Telegram settings screen.
+  id                   Int       @id @default(1)
+  enabled              Boolean   @default(false)
+  notifyGroupChatId    String?
+  notifyOnNewRequest   Boolean   @default(true)
+  notifyOnStatusChange Boolean   @default(true)
+  notifyOnDeadline     Boolean   @default(true)
+  notifyOnOverdue      Boolean   @default(true)
+  autoRunCron          Boolean   @default(false)
+  scheduledTimes       String    @default("[]")
+  lastCronRun          DateTime?
+  lastManualRun        DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
 model Request {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   title       String
   description String
-  status      String   @default("new") // new, in_progress, waiting_response, resolved, closed, cancelled
-  priority    String   @default("medium") // low, medium, high, urgent
+  status      String    @default("new") // new, in_progress, waiting_response, resolved, closed, cancelled
+  priority    String    @default("medium") // low, medium, high, urgent
   deadline    DateTime?
   resolvedAt  DateTime?
   closedAt    DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   // Domain-specific fields
-  linkSite            String?  // Link/site
-  donVi               String?  // Đơn vị
-  linkChucNang        String?  // Link chức năng
-  hienTrang           String?  // Hiện trạng
-  noiDungDieuChinh    String?  // Nội dung cần điều chỉnh
-  quyTrinhThaoTac     String?  // Quy trình thao tác
+  linkSite         String? // Link/site
+  donVi            String? // Đơn vị
+  linkChucNang     String? // Link chức năng
+  hienTrang        String? // Hiện trạng
+  noiDungDieuChinh String? // Nội dung cần điều chỉnh
+  quyTrinhThaoTac  String? // Quy trình thao tác
 
   requesterId String
-  assigneeId  String?  // Primary assignee (for backward compat)
+  assigneeId  String? // Primary assignee (for backward compat)
   categoryId  String?
 
-  requester   User      @relation("Requester", fields: [requesterId], references: [id])
-  assignee    User?     @relation("Assignee", fields: [assigneeId], references: [id])
-  category    Category? @relation(fields: [categoryId], references: [id])
+  requester   User                @relation("Requester", fields: [requesterId], references: [id])
+  assignee    User?               @relation("Assignee", fields: [assigneeId], references: [id])
+  category    Category?           @relation(fields: [categoryId], references: [id])
   comments    Comment[]
   auditLogs   AuditLog[]
   attachments Attachment[]
@@ -132,13 +149,13 @@ model Request {
 }
 
 model RequestAssignment {
-  id          String   @id @default(cuid())
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
 
   requestId String
   userId    String
-  role      String   @default("assignee") // assignee, viewer
-  status    String   @default("active") // active, removed
+  role      String @default("assignee") // assignee, viewer
+  status    String @default("active") // active, removed
 
   request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
   user    User    @relation(fields: [userId], references: [id])
@@ -149,11 +166,11 @@ model RequestAssignment {
 }
 
 model Comment {
-  id        String   @id @default(cuid())
-  content   String
-  isInternal Boolean @default(false) // Internal notes (only visible to agents/admin)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  content    String
+  isInternal Boolean  @default(false) // Internal notes (only visible to agents/admin)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   userId    String
   requestId String
@@ -179,8 +196,8 @@ model Attachment {
 
 model AuditLog {
   id        String   @id @default(cuid())
-  action    String   // created, status_changed, assigned, commented, updated
-  details   String?  // JSON string with old/new values
+  action    String // created, status_changed, assigned, commented, updated
+  details   String? // JSON string with old/new values
   createdAt DateTime @default(now())
 
   userId    String
@@ -196,13 +213,13 @@ model Notification {
   id        String   @id @default(cuid())
   title     String
   message   String
-  type      String   // status_change, comment, assignment, overdue
+  type      String // status_change, comment, assignment, overdue
   isRead    Boolean  @default(false)
   link      String?
   createdAt DateTime @default(now())
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead])
   @@index([createdAt])

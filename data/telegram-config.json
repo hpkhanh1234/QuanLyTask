@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "notifyGroupChatId": "-5081969994",
+  "notifyOnNewRequest": true,
+  "notifyOnStatusChange": true,
+  "notifyOnDeadline": true,
+  "notifyOnOverdue": true,
+  "autoRunCron": true,
+  "scheduledTimes": [
+    "08:00",
+    "20:00"
+  ],
+  "lastCronRun": null
+}

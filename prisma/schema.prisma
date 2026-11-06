@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  role          String    @default("requester") // requester, agent, admin
+  department    String?
+  isActive      Boolean   @default(true)
+  telegramChatId String?  // Telegram chat ID for notifications
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  requestsCreated  Request[]    @relation("Requester")
+  requestsAssigned Request[]    @relation("Assignee")
+  assignments      RequestAssignment[]
+  comments         Comment[]
+  auditLogs        AuditLog[]
+  notifications    Notification[]
+  sessions         Session[]
+  accounts         Account[]
+
+  @@index([role])
+  @@index([email])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  color       String    @default("#3b82f6")
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  requests    Request[]
+}
+
+model PriorityLevel {
+  id        String   @id @default(cuid())
+  key       String   @unique // low, medium, high, urgent
+  label     String
+  color     String   @default("#3b82f6")
+  bgColor   String   @default("#DBEAFE")
+  textColor  String  @default("#1E40AF")
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Request {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  status      String   @default("new") // new, in_progress, waiting_response, resolved, closed, cancelled
+  priority    String   @default("medium") // low, medium, high, urgent
+  deadline    DateTime?
+  resolvedAt  DateTime?
+  closedAt    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Domain-specific fields
+  linkSite            String?  // Link/site
+  donVi               String?  // Đơn vị
+  linkChucNang        String?  // Link chức năng
+  hienTrang           String?  // Hiện trạng
+  noiDungDieuChinh    String?  // Nội dung cần điều chỉnh
+  quyTrinhThaoTac     String?  // Quy trình thao tác
+
+  requesterId String
+  assigneeId  String?  // Primary assignee (for backward compat)
+  categoryId  String?
+
+  requester   User      @relation("Requester", fields: [requesterId], references: [id])
+  assignee    User?     @relation("Assignee", fields: [assigneeId], references: [id])
+  category    Category? @relation(fields: [categoryId], references: [id])
+  comments    Comment[]
+  auditLogs   AuditLog[]
+  attachments Attachment[]
+  assignments RequestAssignment[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([requesterId])
+  @@index([assigneeId])
+  @@index([categoryId])
+  @@index([createdAt])
+}
+
+model RequestAssignment {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+
+  requestId String
+  userId    String
+  role      String   @default("assignee") // assignee, viewer
+  status    String   @default("active") // active, removed
+
+  request Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([requestId, userId])
+  @@index([requestId])
+  @@index([userId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  isInternal Boolean @default(false) // Internal notes (only visible to agents/admin)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String
+  requestId String
+  user      User    @relation(fields: [userId], references: [id])
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  filename  String
+  url       String
+  size      Int
+  mimeType  String
+  createdAt DateTime @default(now())
+
+  requestId String
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String   // created, status_changed, assigned, commented, updated
+  details   String?  // JSON string with old/new values
+  createdAt DateTime @default(now())
+
+  userId    String
+  requestId String
+  user      User    @relation(fields: [userId], references: [id])
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  type      String   // status_change, comment, assignment, overdue
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}

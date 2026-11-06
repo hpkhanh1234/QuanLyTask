@@ -1,0 +1,8 @@
+{
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/notifications/route": "app/api/notifications/route.js",
+  "/api/chat/route": "app/api/chat/route.js",
+  "/api/admin/bat-schedule/route": "app/api/admin/bat-schedule/route.js",
+  "/(app)/admin/settings/page": "app/(app)/admin/settings/page.js",
+  "/(app)/admin/help/page": "app/(app)/admin/help/page.js"
+}

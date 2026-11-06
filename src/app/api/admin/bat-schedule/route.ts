@@ -15,6 +15,9 @@ import {
   type BatScheduleMode,
 } from "@/lib/bat-scheduler";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 async function requireAdmin() {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
